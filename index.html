@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mapa de Fermentadores (700)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+    h2 {
+      margin: 0.75rem 0 0.25rem;
+      font-size: 0.95rem;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 1rem 1.5rem 1.5rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-bottom: 0.75rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      justify-content: center;
+    }
+    .legend button {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid #d4d4d4;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    .legend button.selected {
+      border-width: 2px;
+      border-color: #2563eb;
+    }
+    .color-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 1px solid #00000044;
+    }
+
+    /* puntos de la leyenda */
+    .dot-none     { background: #e5e7eb; }    /* gris */
+    .dot-entamado { background: #FFD400; }    /* amarillo fuerte */
+    .dot-clasif   { background: #0057FF; }    /* azul intenso */
+    .dot-roto     { background: #D32F2F; }    /* rojo roto */
+    .dot-vacio    { background: #F5F5F5; }    /* vacío */
+    .dot-limpio   { background: #2E7D32; }    /* verde limpio */
+
+    .summary {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #4b5563;
+      margin-bottom: 0.5rem;
+    }
+
+    .notify-bar {
+      text-align: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .btn-notify {
+      padding: 0.4rem 0.9rem;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.85rem;
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .btn-notify:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .block {
+      margin-top: 0.5rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 0.5rem;
+      background: #f9fafb;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+      gap: 4px;
+    }
+
+    .cell {
+      position: relative;
+      aspect-ratio: 1 / 1;         /* círculo */
+      border-radius: 9999px;
+      border: 1px solid #d4d4d4;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .cell span {
+      background: #ffffffaa;
+      border-radius: 999px;
+      padding: 0 0.25rem;
+    }
+
+    /* COLORES DE ESTADO (más contrastados) */
+
+    /* Sin estado */
+    .estado-none {
+      background: #e5e7eb;          /* gris claro */
+      color: #000;
+    }
+
+    /* Lleno – Entamado (amarillo fuerte) */
+    .estado-entamado {
+      background: #FFD400;
+      color: #000;
+    }
+
+    /* Lleno – Clasificado (azul intenso) */
+    .estado-clasif {
+      background: #0057FF;
+      color: #ffffff;
+    }
+
+    /* Roto (mantenido) */
+    .estado-roto {
+      background: #D32F2F;
+      color: #ffffff;
+      border: 2px solid #000000;    /* borde más marcado */
+    }
+
+    /* Vacío (mantenido) */
+    .estado-vacio {
+      background: #F5F5F5;
+      color: #000000;
+      border: 1px dashed #9ca3af;   /* borde punteado para diferenciar */
+    }
+
+    /* Limpio (mantenido) */
+    .estado-limpio {
+      background: #2E7D32;
+      color: #ffffff;
+      border: 2px solid #14532d;    /* borde verde oscuro */
+    }
+
+    @media (max-width: 640px) {
+      .cell {
+        font-size: 0.6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Mapa de 700 Fermentadores</h1>
+    <div class="subtitle">
+      Colores reforzados para distinguir Entamado / Clasificado y mantener Roto, Vacío y Limpio.
+    </div>
+
+    <!-- LEYENDA / PALETA -->
+    <div class="legend" id="legend">
+      <button data-state="none" class="selected">
+        <div class="color-dot dot-none"></div> Sin estado
+      </button>
+      <button data-state="entamado">
+        <div class="color-dot dot-entamado"></div> Lleno – Entamado
+      </button>
+      <button data-state="clasif">
+        <div class="color-dot dot-clasif"></div> Lleno – Clasificado
+      </button>
+      <button data-state="roto">
+        <div class="color-dot dot-roto"></div> Roto
+      </button>
+      <button data-state="vacio">
+        <div class="color-dot dot-vacio"></div> Vacío
+      </button>
+      <button data-state="limpio">
+        <div class="color-dot dot-limpio"></div> Limpio
+      </button>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="notify-bar">
+      <button id="notifyNowBtn" class="btn-notify">
+        Enviar notificación de resumen
+      </button>
+    </div>
+
+    <!-- BLOQUE SUPERIOR (como la parte de arriba del plano) -->
+    <div class="block">
+      <h2>Bloque superior (1–450)</h2>
+      <div class="grid" id="grid-top"></div>
+    </div>
+
+    <!-- BLOQUE INFERIOR (como la banda inferior del plano) -->
+    <div class="block">
+      <h2>Bloque inferior (451–700)</h2>
+      <div class="grid" id="grid-bottom"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'mapa_fermentadores_700_colores_v2';
+    const TOTAL = 700;
+    const STATES = ['none', 'entamado', 'clasif', 'roto', 'vacio', 'limpio'];
+
+    let fermentadores = [];
+    let selectedState = 'none';
+
+    function loadFromStorage() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) {
+        fermentadores = Array.from({ length: TOTAL }, (_, i) => ({
+          id: i + 1,
+          state: 'none'
+        }));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length === TOTAL) {
+          fermentadores = parsed;
+        } else {
+          fermentadores = Array.from({ length: TOTAL }, (_, i) => ({
+            id: i + 1,
+            state: 'none'
+          }));
+        }
+      } catch (e) {
+        console.error('Error leyendo almacenamiento local', e);
+        fermentadores = Array.from({ length: TOTAL }, (_, i) => ({
+          id: i + 1,
+          state: 'none'
+        }));
+      }
+    }
+
+    function saveToStorage() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fermentadores));
+    }
+
+    function computeCounts() {
+      const counts = {
+        none: 0,
+        entamado: 0,
+        clasif: 0,
+        roto: 0,
+        vacio: 0,
+        limpio: 0
+      };
+      fermentadores.forEach(f => counts[f.state]++);
+      return counts;
+    }
+
+    function updateSummary() {
+      const counts = computeCounts();
+      const summary = document.getElementById('summary');
+      summary.textContent =
+        `Total: ${TOTAL} | ` +
+        `Sin estado: ${counts.none} | ` +
+        `Lleno–Entamado: ${counts.entamado} | ` +
+        `Lleno–Clasificado: ${counts.clasif} | ` +
+        `Roto: ${counts.roto} | ` +
+        `Vacío: ${counts.vacio} | ` +
+        `Limpio: ${counts.limpio}`;
+    }
+
+    function createCell(id, state) {
+      const div = document.createElement('div');
+      div.className = 'cell estado-' + state;
+      div.dataset.id = id;
+      div.dataset.state = state;
+      const span = document.createElement('span');
+      span.textContent = id;
+      div.appendChild(span);
+
+      div.addEventListener('click', () => {
+        setFermentadorState(id, selectedState);
+      });
+
+      return div;
+    }
+
+    function renderGrids() {
+      const top = document.getElementById('grid-top');
+      const bottom = document.getElementById('grid-bottom');
+      top.innerHTML = '';
+      bottom.innerHTML = '';
+
+      fermentadores.forEach(f => {
+        const cell = createCell(f.id, f.state);
+        if (f.id <= 450) {
+          top.appendChild(cell);
+        } else {
+          bottom.appendChild(cell);
+        }
+      });
+
+      updateSummary();
+    }
+
+    function setFermentadorState(id, state) {
+      const f = fermentadores.find(x => x.id === id);
+      if (!f) return;
+      f.state = state;
+      saveToStorage();
+
+      const selector = `.cell[data-id="${id}"]`;
+      document.querySelectorAll(selector).forEach(cell => {
+        STATES.forEach(s => cell.classList.remove('estado-' + s));
+        cell.classList.add('estado-' + state);
+        cell.dataset.state = state;
+      });
+
+      updateSummary();
+    }
+
+    function setupLegend() {
+      const legend = document.getElementById('legend');
+      legend.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-state]');
+        if (!btn) return;
+        const state = btn.dataset.state;
+        selectedState = state;
+        document
+          .querySelectorAll('#legend button')
+          .forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    }
+
+    // --- NOTIFICACIONES ---
+
+    function requestNotificationPermission() {
+      if (!('Notification' in window)) {
+        console.log('Este navegador no soporta notificaciones.');
+        const btn = document.getElementById('notifyNowBtn');
+        if (btn) btn.disabled = true;
+        return;
+      }
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then((perm) => {
+          if (perm !== 'granted') {
+            const btn = document.getElementById('notifyNowBtn');
+            if (btn) btn.disabled = true;
+          }
+        });
+      } else if (Notification.permission === 'denied') {
+        const btn = document.getElementById('notifyNowBtn');
+        if (btn) btn.disabled = true;
+      }
+    }
+
+    function sendSummaryNotification() {
+      if (!('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+
+      const counts = computeCounts();
+      const body =
+        `Total: ${TOTAL}\n` +
+        `Lleno–Entamado: ${counts.entamado}\n` +
+        `Lleno–Clasificado: ${counts.clasif}\n` +
+        `Roto: ${counts.roto}\n` +
+        `Vacío: ${counts.vacio}\n` +
+        `Limpio: ${counts.limpio}`;
+
+      new Notification('Resumen de fermentadores', {
+        body: body
+      });
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('last_notification_date', todayStr);
+    }
+
+    // Notificación automática una vez al día, al abrir la app
+    function maybeNotifyToday() {
+      if (!('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const last = localStorage.getItem('last_notification_date');
+      if (last === todayStr) return; // ya se notificó hoy
+
+      sendSummaryNotification();
+    }
+
+    function setupNotifyButton() {
+      const btn = document.getElementById('notifyNowBtn');
+      if (!btn) return;
+
+      btn.addEventListener('click', () => {
+        if (!('Notification' in window)) {
+          alert('Este dispositivo no admite notificaciones del navegador.');
+          return;
+        }
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().then((perm) => {
+            if (perm === 'granted') {
+              sendSummaryNotification();
+            } else {
+              alert('No se han activado las notificaciones.');
+            }
+          });
+        } else if (Notification.permission === 'granted') {
+          sendSummaryNotification();
+        } else {
+          alert('Las notificaciones están bloqueadas en el navegador.');
+        }
+      });
+    }
+
+    // Service Worker (modo app)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+          console.log('Service Worker no registrado:', err);
+        });
+      });
+    }
+
+    // Init
+    loadFromStorage();
+    setupLegend();
+    renderGrids();
+    setupNotifyButton();
+    requestNotificationPermission();
+    maybeNotifyToday();
+  </script>
+</body>
+</html>

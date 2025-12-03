@@ -1,0 +1,9 @@
+{
+  "name": "Mapa de Fermentadores",
+  "short_name": "Fermentadores",
+  "start_url": "index.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb"
+}

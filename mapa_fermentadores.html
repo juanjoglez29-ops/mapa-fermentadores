@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mapa de Fermentadores (700)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 1rem 1.5rem 1.5rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      justify-content: center;
+    }
+    .legend button {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid #d4d4d4;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    .legend button.selected {
+      border-width: 2px;
+      border-color: #2563eb;
+    }
+    .color-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 1px solid #00000022;
+    }
+
+    .dot-none     { background: #e5e7eb; }  /* gris */
+    .dot-entamado { background: #fed7aa; }  /* naranja suave */
+    .dot-clasif   { background: #bfdbfe; }  /* azul suave */
+    .dot-roto     { background: #fecaca; }  /* rojo suave */
+    .dot-vacio    { background: #ddd6fe; }  /* lila */
+    .dot-limpio   { background: #bbf7d0; }  /* verde suave */
+
+    .summary {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #4b5563;
+      margin-bottom: 0.75rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+      gap: 4px;
+    }
+
+    .cell {
+      position: relative;
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid #d4d4d4;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      box-sizing: border-box;
+      padding-bottom: 2px;
+    }
+
+    .cell span {
+      background: #ffffffaa;
+      border-radius: 999px;
+      padding: 0 0.25rem;
+    }
+
+    /* Colores por estado */
+    .estado-none {
+      background: #e5e7eb;
+    }
+    .estado-entamado {
+      background: #fdba74;
+    }
+    .estado-clasif {
+      background: #60a5fa;
+    }
+    .estado-roto {
+      background: #fca5a5;
+    }
+    .estado-vacio {
+      background: #a855f7;
+      color: #f9fafb;
+    }
+    .estado-limpio {
+      background: #22c55e;
+      color: #f9fafb;
+    }
+
+    @media (max-width: 640px) {
+      .cell {
+        height: 32px;
+        font-size: 0.6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Mapa de 700 Fermentadores</h1>
+
+    <div class="legend" id="legend">
+      <button data-state="none" class="selected">
+        <div class="color-dot dot-none"></div> Sin estado
+      </button>
+      <button data-state="entamado">
+        <div class="color-dot dot-entamado"></div> Lleno – Entamado
+      </button>
+      <button data-state="clasif">
+        <div class="color-dot dot-clasif"></div> Lleno – Clasificado
+      </button>
+      <button data-state="roto">
+        <div class="color-dot dot-roto"></div> Roto
+      </button>
+      <button data-state="vacio">
+        <div class="color-dot dot-vacio"></div> Vacío
+      </button>
+      <button data-state="limpio">
+        <div class="color-dot dot-limpio"></div> Limpio
+      </button>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'mapa_fermentadores_700_v1';
+    const TOTAL = 700;
+
+    const STATES = ['none', 'entamado', 'clasif', 'roto', 'vacio', 'limpio'];
+
+    let fermentadores = [];
+    let selectedState = 'none';
+
+    function loadFromStorage() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) {
+        fermentadores = Array.from({ length: TOTAL }, (_, i) => ({
+          id: i + 1,
+          state: 'none'
+        }));
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length === TOTAL) {
+          fermentadores = parsed;
+        } else {
+          fermentadores = Array.from({ length: TOTAL }, (_, i) => ({
+            id: i + 1,
+            state: 'none'
+          }));
+        }
+      } catch (e) {
+        console.error('Error leyendo almacenamiento local', e);
+        fermentadores = Array.from({ length: TOTAL }, (_, i) => ({
+          id: i + 1,
+          state: 'none'
+        }));
+      }
+    }
+
+    function saveToStorage() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fermentadores));
+    }
+
+    function updateSummary() {
+      const counts = {
+        none: 0,
+        entamado: 0,
+        clasif: 0,
+        roto: 0,
+        vacio: 0,
+        limpio: 0
+      };
+      fermentadores.forEach(f => counts[f.state]++);
+      const summary = document.getElementById('summary');
+      summary.textContent =
+        `Total: ${TOTAL} | ` +
+        `Sin estado: ${counts.none} | ` +
+        `Lleno–Entamado: ${counts.entamado} | ` +
+        `Lleno–Clasificado: ${counts.clasif} | ` +
+        `Roto: ${counts.roto} | ` +
+        `Vacío: ${counts.vacio} | ` +
+        `Limpio: ${counts.limpio}`;
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      fermentadores.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'cell estado-' + f.state;
+        div.dataset.id = f.id;
+        div.dataset.state = f.state;
+        const span = document.createElement('span');
+        span.textContent = f.id;
+        div.appendChild(span);
+
+        div.addEventListener('click', () => {
+          setFermentadorState(f.id, selectedState);
+        });
+
+        grid.appendChild(div);
+      });
+      updateSummary();
+    }
+
+    function setFermentadorState(id, state) {
+      const f = fermentadores.find(x => x.id === id);
+      if (!f) return;
+      f.state = state;
+      saveToStorage();
+      const cell = document.querySelector(`.cell[data-id="${id}"]`);
+      if (cell) {
+        STATES.forEach(s => cell.classList.remove('estado-' + s));
+        cell.classList.add('estado-' + state);
+        cell.dataset.state = state;
+      }
+      updateSummary();
+    }
+
+    function setupLegend() {
+      const legend = document.getElementById('legend');
+      legend.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-state]');
+        if (!btn) return;
+        const state = btn.dataset.state;
+        selectedState = state;
+        document
+          .querySelectorAll('#legend button')
+          .forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    }
+
+    // Init
+    loadFromStorage();
+    setupLegend();
+    renderGrid();
+  </script>
+</body>
+</html>
